@@ -1,2 +1,2 @@
 # alter-ego
-A secure databank for online identities
+A secure databank for online agents
