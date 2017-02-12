@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 	"strconv"
+	"bufio"
 	"io/ioutil"
 	"path/filepath"
 	"encoding/json"
@@ -53,16 +54,51 @@ func (config *Config) Read(filepath string) {
 	return
 }
 
+func dispatch(reqPath string) (respPath string, err error) {
+	f, _ := os.Open(reqPath)
+	r := bufio.NewReader(f)
+	request, err := http.ReadRequest(r)
+	
+	//fmt.Println("dispatch", request, err)
+	
+	txPath := filepath.Dir(reqPath)
+	respPath = filepath.Join(txPath, "response")
+	
+	response, _ := os.OpenFile(respPath, os.O_CREATE, 0644)
+	request.Write(response)
+	response.Close()
+	
+	fmt.Println("dispatch wrote:", respPath)
+	
+	return
+}
+
 func index(w http.ResponseWriter, r *http.Request) {
 	txID := uuid.New()
 	txPath := filepath.Join(sessionPath, "txs", txID.String())
 	os.MkdirAll(txPath, os.ModePerm)
-	reqpath := filepath.Join(txPath, "request")
-	f, _ := os.Create(reqpath)
+	reqPath := filepath.Join(txPath, "request")
+	f, _ := os.Create(reqPath)
 	r.Write(f)
 	f.Close()
 
-	fmt.Fprintf(w, "index")
+	logPath := filepath.Join(sessionPath, "txs", "log")
+	writeLog(logPath, txID)	
+	
+	respPath, err := dispatch(reqPath)
+	
+	if err != nil {
+		fmt.Fprintf(w, "%v", err)
+	} else {
+		response, _ := ioutil.ReadFile(respPath)
+		w.Write(response)
+	}
+}
+
+func writeLog(logPath string, id uuid.UUID) {
+	log, _ := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	fmt.Fprintf(log, "%v|%v\n", time.Now().UTC(), id)
+	log.Close()
 }
 
 func main() {
@@ -79,12 +115,9 @@ func main() {
 	sessionPath = filepath.Join(datapath, "sessions", sessionID.String())
 	err = os.MkdirAll(sessionPath, os.ModePerm)
 	fmt.Println("session:", sessionID, sessionPath, err)
-	
+
 	logPath := filepath.Join(datapath, "sessions", "log")
-	log, _ := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
-	//log.WriteString(sessionID.String())
-	fmt.Fprintf(log, "%v|%v\n", time.Now().UTC(), sessionID)
-	log.Close()
+	writeLog(logPath, sessionID)	
 	
 	addr := "localhost:" + strconv.Itoa(config.Port)
 	
