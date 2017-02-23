@@ -2,10 +2,11 @@ package main
 
 import (
 	"os"
+	"os/exec"
 	"fmt"
 	"time"
 	"strconv"
-	"bufio"
+	//"bufio"
 	"io/ioutil"
 	"path/filepath"
 	"encoding/json"
@@ -55,20 +56,23 @@ func (config *Config) Read(filepath string) {
 }
 
 func dispatch(reqPath string) (respPath string, err error) {
-	f, _ := os.Open(reqPath)
-	r := bufio.NewReader(f)
-	request, err := http.ReadRequest(r)
+	//f, _ := os.Open(reqPath)
+	//r := bufio.NewReader(f)
+	//request, err := http.ReadRequest(r)
 	
 	//fmt.Println("dispatch", request, err)
 	
 	txPath := filepath.Dir(reqPath)
 	respPath = filepath.Join(txPath, "response")
 	
-	response, _ := os.OpenFile(respPath, os.O_CREATE, 0644)
-	request.Write(response)
-	response.Close()
+	//response, _ := os.OpenFile(respPath, os.O_CREATE, 0644)
+	//request.Write(response)
+	//response.Close()
 	
-	fmt.Println("dispatch wrote:", respPath)
+	cmd := exec.Command("gatekeeper", reqPath)
+	output, err := cmd.Output()
+	
+	fmt.Println("cmd out", string(output[:]), err)
 	
 	return
 }
